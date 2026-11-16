@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import messagebox
 import subprocess
 import platform
+import shutil
 # Les imports re et Pillow ne sont plus strictement nécessaires pour la logique de prix/remplacement
 
 # ⬇️ Importations pour gérer le PNG avec transparence (gardées pour votre interface)
@@ -15,6 +16,22 @@ except ImportError:
 
 # 📂 Dossier du script courant
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# ⭐ Dossier "settings" : tous les fichiers générés par ce script y sont enregistrés
+SETTINGS_DIR = os.path.join(BASE_DIR, "settings")
+os.makedirs(SETTINGS_DIR, exist_ok=True)
+PRIX_JSON_PATH = os.path.join(SETTINGS_DIR, "prix_chambres.json")
+PRIX_TXT_PATH = os.path.join(SETTINGS_DIR, "prix_calcules.txt")
+
+# Migration (une seule fois) : copie les anciens fichiers placés à côté du script vers settings/
+for _nom in ("prix_chambres.json", "prix_calcules.txt"):
+    _ancien = os.path.join(BASE_DIR, _nom)
+    _nouveau = os.path.join(SETTINGS_DIR, _nom)
+    try:
+        if os.path.isfile(_ancien) and not os.path.exists(_nouveau):
+            shutil.copy2(_ancien, _nouveau)
+    except Exception:
+        pass
 
 # Constantes pour les calculs
 TVA = 0.09
@@ -39,7 +56,7 @@ ENTRY_FIELDS = {}
 
 def load_from_json():
     """Charge les données depuis le fichier JSON."""
-    json_path = os.path.join(BASE_DIR, "prix_chambres.json")
+    json_path = PRIX_JSON_PATH
     if not os.path.exists(json_path):
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump({}, f)
@@ -51,7 +68,8 @@ def load_from_json():
 
 def save_to_json(prices):
     """Sauvegarde les prix dans le fichier JSON."""
-    json_path = os.path.join(BASE_DIR, "prix_chambres.json")
+    json_path = PRIX_JSON_PATH
+    os.makedirs(SETTINGS_DIR, exist_ok=True)
     try:
         with open(json_path, "w", encoding="utf-8") as f:
             # Sauvegarde les prix sous la forme : {"chambre_single": {"ttc": "12000", "puht": "11009.17"}}
@@ -107,7 +125,7 @@ def creer_fichier_prix():
         save_to_json(resultats_complets)
 
         # Création/écriture du fichier texte (conservé)
-        txt_path = os.path.join(BASE_DIR, "prix_calcules.txt")
+        txt_path = PRIX_TXT_PATH
         with open(txt_path, "w", encoding="utf-8") as f:
             for key, data in resultats_complets.items():
                 f.write(f"{key} - TTC Saisi: {data['ttc']}, PUHT Calculé : {data['puht']}\n")
