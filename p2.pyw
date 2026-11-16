@@ -23,18 +23,23 @@ BASE_CHEMIN_RESEAU = r"\\192.168.100.20\dossier partage de serveur\proforma"
 
 
 #  Le chemin vers le fichier de prix doit pointer vers le même répertoire que p1.pyw et p2.pyw
-FICHIER_PRIX_JSON = Path(__file__).resolve().parent / "prix_chambres.json"
+# (déplacé dans settings/ ; p1.pyw l'y écrit). Repli sur l'ancien emplacement si pas encore migré.
+FICHIER_PRIX_JSON = Path(__file__).resolve().parent / "settings" / "prix_chambres.json"
+if not FICHIER_PRIX_JSON.exists() and (Path(__file__).resolve().parent / "prix_chambres.json").exists():
+    FICHIER_PRIX_JSON = Path(__file__).resolve().parent / "prix_chambres.json"
 
 # ⭐ Informations de l'entreprise émettrice (saisies au premier lancement)
-FICHIER_ENTREPRISE_JSON = Path(__file__).resolve().parent / "entreprise.json"
+# ⭐ Dossier "settings" (à côté du script) : contient tous les fichiers JSON de configuration
+DOSSIER_SETTINGS = Path(__file__).resolve().parent / "settings"
+FICHIER_ENTREPRISE_JSON = DOSSIER_SETTINGS / "entreprise.json"
 
 
 # Tous les fichiers de travail et de configuration utiliseront ce chemin
 DOSSIER_PROFORMA = Path(BASE_CHEMIN_RESEAU)
 DOSSIER_ANCIENS = DOSSIER_PROFORMA / "anciens"  # Archive des anciennes proformas
-FICHIER_CLIENTS_JSON = DOSSIER_PROFORMA / "clients_details.json"
-FICHIER_NUMERO_PROFORMA_JSON = DOSSIER_PROFORMA / "proforma_counter.json"
-FICHIER_NOM_PDF_TEMP_JSON = DOSSIER_PROFORMA / "last_proforma_pdf.json"
+FICHIER_CLIENTS_JSON = DOSSIER_SETTINGS / "clients_details.json"
+FICHIER_NUMERO_PROFORMA_JSON = DOSSIER_SETTINGS / "proforma_counter.json"
+FICHIER_NOM_PDF_TEMP_JSON = DOSSIER_SETTINGS / "last_proforma_pdf.json"
 
 # ⭐ VÉRIFIEZ ET MODIFIEZ CE CHEMIN SI NÉCESSAIRE
 LIBREOFFICE_PATH = r"C:\Program Files\LibreOffice\program\soffice.exe"
@@ -181,6 +186,22 @@ CHAMPS_ENTREPRISE = [
     ("rib", "RIB", False),
 ]
 
+def migrer_anciens_fichiers():
+    """Copie (une seule fois) les anciens fichiers JSON vers settings/ s'ils n'y sont pas encore.
+    Les originaux ne sont pas supprimés. Garde la continuité du compteur et de la liste des clients."""
+    anciens = [
+        (DOSSIER_PROFORMA / "clients_details.json", FICHIER_CLIENTS_JSON),
+        (DOSSIER_PROFORMA / "proforma_counter.json", FICHIER_NUMERO_PROFORMA_JSON),
+        (Path(__file__).resolve().parent / "entreprise.json", FICHIER_ENTREPRISE_JSON),
+    ]
+    for ancien, nouveau in anciens:
+        try:
+            if ancien.is_file() and not nouveau.exists():
+                DOSSIER_SETTINGS.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(str(ancien), str(nouveau))
+        except Exception:
+            pass
+
 def charger_entreprise():
     """Charge entreprise.json. Retourne {} s'il est absent ou invalide."""
     try:
@@ -195,6 +216,7 @@ def charger_entreprise():
 
 def sauvegarder_entreprise(data):
     try:
+        DOSSIER_SETTINGS.mkdir(parents=True, exist_ok=True)
         with open(FICHIER_ENTREPRISE_JSON, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
         return True
@@ -289,7 +311,7 @@ def modifier_infos_entreprise():
 def charger_clients():
     global clients_details
     try:
-        DOSSIER_PROFORMA.mkdir(parents=True, exist_ok=True)
+        DOSSIER_SETTINGS.mkdir(parents=True, exist_ok=True)
         with open(FICHIER_CLIENTS_JSON, 'r', encoding='utf-8') as f:
             clients_details = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
@@ -300,7 +322,7 @@ def charger_clients():
 
 def sauvegarder_clients():
     try:
-        DOSSIER_PROFORMA.mkdir(parents=True, exist_ok=True)
+        DOSSIER_SETTINGS.mkdir(parents=True, exist_ok=True)
         with open(FICHIER_CLIENTS_JSON, 'w', encoding='utf-8') as f:
             json.dump(clients_details, f, indent=4, ensure_ascii=False)
     except Exception as e:
@@ -312,7 +334,7 @@ def update_client_list():
 def load_proforma_counter():
     """Charge le dernier numéro utilisé (un seul entier)."""
     try:
-        DOSSIER_PROFORMA.mkdir(parents=True, exist_ok=True)
+        DOSSIER_SETTINGS.mkdir(parents=True, exist_ok=True)
         with open(FICHIER_NUMERO_PROFORMA_JSON, 'r', encoding='utf-8') as f:
             return int(f.read().strip())
     except (FileNotFoundError, ValueError):
@@ -324,7 +346,7 @@ def load_proforma_counter():
 def save_proforma_counter(number):
     """Sauvegarde le numéro de proforma qui vient d'être utilisé."""
     try:
-        DOSSIER_PROFORMA.mkdir(parents=True, exist_ok=True)
+        DOSSIER_SETTINGS.mkdir(parents=True, exist_ok=True)
         with open(FICHIER_NUMERO_PROFORMA_JSON, 'w', encoding='utf-8') as f:
             f.write(str(number))
     except Exception as e:
@@ -1291,6 +1313,7 @@ def executer_estampillage(fname_pdf_brut_path):
     # 1. Sauvegarde du nom du PDF brut dans le JSON pour apply_stamp.py
     try:
         data = {"last_proforma_name": fname_pdf_brut_path.name}
+        DOSSIER_SETTINGS.mkdir(parents=True, exist_ok=True)
         with open(FICHIER_NOM_PDF_TEMP_JSON, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
     except Exception as e:
@@ -1603,6 +1626,9 @@ menubar.add_cascade(label="Paramètres", menu=menu_parametres)
 root.config(menu=menubar)
 
 # --- Démarrage ---
+# ⭐ Récupère les anciens fichiers JSON (réseau / dossier du script) vers settings/
+migrer_anciens_fichiers()
+
 # ⭐ Premier lancement : demander les informations de l'entreprise
 entreprise_infos = charger_entreprise()
 if not entreprise_infos.get("nom"):
