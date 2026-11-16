@@ -12,8 +12,12 @@ import sys
 BASE_CHEMIN_RESEAU = r"\\192.168.100.20\dossier partage de serveur\proforma" 
 DOSSIER_PROFORMA = Path(BASE_CHEMIN_RESEAU) 
 
+# Dossier du script et dossier "settings" (doit correspondre au script principal p2.pyw)
+DOSSIER_SCRIPT = Path(__file__).resolve().parent
+DOSSIER_SETTINGS = DOSSIER_SCRIPT / "settings"
+
 # Le chemin d'accès au fichier JSON temporaire (doit correspondre au script principal)
-FICHIER_NOM_PDF_TEMP_JSON = DOSSIER_PROFORMA / "last_proforma_pdf.json" 
+FICHIER_NOM_PDF_TEMP_JSON = DOSSIER_SETTINGS / "last_proforma_pdf.json"
 
 # =================================================================
 # --- FONCTION D'APPLICATION DU CACHET (MODIFIÉE POUR TOUTES LES PAGES) ---
@@ -127,7 +131,7 @@ if __name__ == "__main__":
         sys.exit(1) 
 
     CHEMIN_PDF_BRUT = DOSSIER_PROFORMA / pdf_name
-    NOM_DE_L_IMAGE = "stamp.png" 
+    NOM_DE_L_IMAGE = str(DOSSIER_SCRIPT / "stamp.png")
     LARGEUR_VOULUE = 120
     MARGE_DU_BORD_GAUCHE = 30
     MARGE_DU_BORD_BAS = 30
